@@ -125,7 +125,7 @@ func HashValue(value, tableSize int) int {
 	// модуль от размера таблицы чтобы получить валидный ключ
 	hashValue := middleDigits % tableSize
 
-	// fmt.Println("middle: ", middleDigits, "hash value: ", hashValue, "value: ", value, "square: ", squared)
+	fmt.Printf("середина: %d\t hash значение: %d\t значение: %d\t квадрат: %d\t\n ", middleDigits, hashValue, value, squared)
 
 	return hashValue
 }
