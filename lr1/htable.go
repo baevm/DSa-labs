@@ -46,7 +46,11 @@ func (ht *HTable) Get(key int) (HValue, bool) {
 	probeCount := 0
 	size := len(ht.buckets)
 
-	for ht.buckets[hash].value != key {
+	if ht.buckets[hash].key == -1 {
+		return HValue{}, false
+	}
+
+	for ht.buckets[hash].value != key && probeCount < 30 {
 		hash = (hash0 + probeCount*probeCount) % size
 		probeCount += 1
 	}
