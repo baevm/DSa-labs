@@ -27,10 +27,11 @@ func (hptr *MinHeap) Push(i Comparer) {
 	h = append(h, i)
 
 	idx := len(h) - 1
+	// parent := (idx - 1) / 2
 
 	for idx > 0 {
 		parentIdx := idx / 2
-		
+
 		if h[idx].Compare(h[parentIdx]) > 0 {
 			break
 		}
@@ -132,6 +133,18 @@ func (hptr *MinHeap) PrintHeap() {
 	}
 
 	fmt.Println(hs.String())
+}
+
+func (hptr *MinHeap) Traverse(idx int) {
+	h := MinHeap(*hptr)
+
+	if idx >= len(h) {
+		return
+	}
+
+	fmt.Printf("%d ->", h[idx])
+	hptr.Traverse((2 * idx) + 1)
+	hptr.Traverse((2 * idx) + 2)
 }
 
 type Int int

@@ -29,6 +29,9 @@ func main() {
 	fmt.Println("size=", len(min))
 
 	min.PrintHeap()
+
+	fmt.Println("Traverse:")
+	min.Traverse(0)
 }
 
 func getRandomElemets(min, max, size int) []int {
