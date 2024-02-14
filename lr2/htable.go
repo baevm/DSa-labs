@@ -47,7 +47,8 @@ func NewHTable(initialSize int) *HTable {
 	}
 
 	for i := range ht.buckets {
-		ht.buckets[i].key = EMPTY_KEY
+		ht.buckets[i].value = -1
+		ht.buckets[i].key = i
 	}
 
 	return ht
@@ -60,7 +61,7 @@ func (ht *HTable) Get(key int) (HValue, error) {
 	probeCount := 0
 	size := len(ht.buckets)
 
-	if ht.buckets[hash].key == EMPTY_KEY {
+	if ht.buckets[hash].value == -1 {
 		return HValue{}, ErrElemNotFound
 	}
 
@@ -69,8 +70,11 @@ func (ht *HTable) Get(key int) (HValue, error) {
 		probeCount += 1
 	}
 
-	if probeCount >= MAX_PROBE_COUNT {
-		return HValue{}, ErrMaxProbe
+	if probeCount >= MAX_PROBE_COUNT && ht.buckets[hash].value != key {
+		for ht.buckets[hash].value != -1 {
+			hash += 1
+			probeCount += 1
+		}
 	}
 
 	return ht.buckets[hash], nil
@@ -85,34 +89,36 @@ func (ht *HTable) Set(key, value int) (int, bool) {
 	probeCount := 0
 	size := len(ht.buckets)
 
-	if ht.buckets[hash].key == EMPTY_KEY {
+	if ht.buckets[hash].value == EMPTY_KEY {
 		ht.buckets[hash] = HValue{key: hash, value: value}
 		isSet = true
+
+		ht.stats.amountOfProbes += 1
 	} else {
 		// Квадратичная проба
-		for ht.buckets[hash].key != EMPTY_KEY && probeCount < MAX_PROBE_COUNT {
+		for ht.buckets[hash].value != -1 && probeCount < 30 {
 			hash = (hash0 + probeCount*probeCount) % size
 			probeCount += 1
 
 			ht.stats.amountOfProbes += 1
-			isSet = true
 		}
 
-		// Линейная проба
-		if !isSet && probeCount >= MAX_PROBE_COUNT {
-			for ht.buckets[hash].key != EMPTY_KEY {
-				hash = hash + 1
-			}
-		}
-
+		isSet = true
 		ht.buckets[hash] = HValue{key: hash, value: value}
+	}
+
+	// Линейная проба
+	if !isSet && probeCount >= 30 {
+		for ht.buckets[hash].value != -1 {
+			hash = hash + 1
+		}
 	}
 
 	ht.stats.usedBucketsCount += 1
 
-	if ht.getCoef() >= LIMIT_COEF {
-		ht.ExtendTable()
-	}
+	// if ht.getCoef() >= LIMIT_COEF {
+	// 	ht.ExtendTable()
+	// }
 
 	return hash, isSet
 }
@@ -127,8 +133,8 @@ func (ht *HTable) Delete(value int) (int, bool) {
 	idx := elem.key
 
 	ht.buckets[idx] = HValue{
-		key:   EMPTY_KEY,
-		value: 0,
+		key:   idx,
+		value: -1,
 	}
 
 	return idx, true
@@ -172,7 +178,7 @@ func (ht *HTable) PrintStats() {
 }
 
 func (ht *HTable) AddRandomElements(min, max int) int {
-	elements := getRandomElemets(min, max, ht.size/2)
+	elements := getRandomElemets(min, max, (ht.size-ht.stats.usedBucketsCount)/2)
 
 	for _, v := range elements {
 		_, isOk := ht.Set(v, v)
@@ -193,27 +199,20 @@ func (ht *HTable) getCoef() float64 {
 func HashValue(value, tableSize int) int {
 	squared := value * value
 
-	// длина квадрата числа
-	length := int(math.Log10(float64(squared))) + 1
-
 	// кол-во цифр из середины
-	digits := 0
-
-	if length%2 == 0 {
-		digits = 2
-	} else {
-		digits = 1
-	}
+	digits := 2
 
 	start := int(math.Log10(float64(squared))) / 2
 
 	// достаем середину
 	middleDigits := (squared / int(math.Pow10(start))) % int(math.Pow10(digits))
 
+	// fmt.Println("test: ", (squared/int(math.Pow(100, float64(start))))%int(math.Pow(100, float64(digits))))
+
 	// модуль от размера таблицы чтобы получить валидный ключ
 	hashValue := middleDigits % tableSize
 
-	fmt.Printf("середина: %d\t hash значение: %d\t значение: %d\t квадрат: %d\n", middleDigits, hashValue, value, squared)
+	fmt.Printf("середина: %d\t hash значение: %d\t значение: %d\t квадрат: %d\t\n ", middleDigits, hashValue, value, squared)
 
 	return hashValue
 }
@@ -229,6 +228,8 @@ func getRandomElemets(min, max, size int) []int {
 	for i := range p {
 		p[i] += min
 	}
+
+	fmt.Println("min ", min, "max ", max, "size ", size, "p ", p, "p len", len(p))
 
 	return p[:size]
 }

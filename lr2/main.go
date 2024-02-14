@@ -39,7 +39,7 @@ func main() {
 	for {
 		fmt.Printf(`
 Выберите нужный вариант:
-%d. Сгенерировать "размер/2" случайных элементов
+%d. Сгенерировать "свободный размер/2" случайных элементов
 %d. Добавить элемент
 %d. Поиск элемента
 %d. Удалить элемент
@@ -132,7 +132,7 @@ func main() {
 		case CHANGE:
 			var element int
 
-			fmt.Print("Введите удаляемый элемент: ")
+			fmt.Print("Введите заменяемый элемент: ")
 			fmt.Scanf("%d", &element)
 
 			_, err := hashTable.Get(element)
@@ -150,8 +150,10 @@ func main() {
 			_, err = hashTable.Get(newElement)
 
 			if err != nil {
-				fmt.Printf("Элемент %d уже существует. \n\n", element)
-				break
+				if !errors.Is(err, ErrElemNotFound) {
+					fmt.Printf("Элемент %d уже существует. \n\n", newElement)
+					break
+				}
 			}
 
 			_, isDeleted := hashTable.Delete(element)

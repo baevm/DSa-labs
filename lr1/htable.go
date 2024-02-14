@@ -17,8 +17,7 @@ type HValue struct {
 
 type HTable struct {
 	buckets []HValue // Ячейки хэш таблицы
-
-	stats Stats
+	stats   Stats    // статистика
 }
 
 func NewHTable(initialSize int) *HTable {
@@ -33,7 +32,8 @@ func NewHTable(initialSize int) *HTable {
 	}
 
 	for i := range ht.buckets {
-		ht.buckets[i].key = -1
+		ht.buckets[i].value = -1
+		ht.buckets[i].key = i
 	}
 
 	return ht
@@ -46,7 +46,7 @@ func (ht *HTable) Get(key int) (HValue, bool) {
 	probeCount := 0
 	size := len(ht.buckets)
 
-	if ht.buckets[hash].key == -1 {
+	if ht.buckets[hash].value == -1 {
 		return HValue{}, false
 	}
 
@@ -67,12 +67,14 @@ func (ht *HTable) Set(key, value int) bool {
 	probeCount := 0
 	size := len(ht.buckets)
 
-	if ht.buckets[hash].key == -1 {
+	if ht.buckets[hash].value == -1 {
 		ht.buckets[hash] = HValue{key: hash, value: value}
 		isSet = true
+
+		ht.stats.amountOfProbes += 1
 	} else {
 		// Квадратичная проба
-		for ht.buckets[hash].key != -1 && probeCount < 30 {
+		for ht.buckets[hash].value != -1 && probeCount < 30 {
 			hash = (hash0 + probeCount*probeCount) % size
 			probeCount += 1
 
@@ -82,7 +84,7 @@ func (ht *HTable) Set(key, value int) bool {
 
 		// Линейная проба
 		if !isSet && probeCount >= 30 {
-			for ht.buckets[hash].key != -1 {
+			for ht.buckets[hash].value != -1 {
 				hash = hash + 1
 			}
 		}
@@ -99,6 +101,7 @@ func (ht *HTable) Print() {
 	fmt.Println("|-------|-------|")
 	fmt.Printf("| %-5s | %-5s |\n", "key", "value")
 	fmt.Println("|-------|-------|")
+
 	for _, h := range ht.buckets {
 		fmt.Printf("| %-5d | %-5d |\n", h.key, h.value)
 	}
@@ -109,22 +112,15 @@ func (ht *HTable) Print() {
 func HashValue(value, tableSize int) int {
 	squared := value * value
 
-	// длина квадрата числа
-	length := int(math.Log10(float64(squared))) + 1
-
 	// кол-во цифр из середины
-	digits := 0
-
-	if length%2 == 0 {
-		digits = 2
-	} else {
-		digits = 1
-	}
+	digits := 2
 
 	start := int(math.Log10(float64(squared))) / 2
 
 	// достаем середину
 	middleDigits := (squared / int(math.Pow10(start))) % int(math.Pow10(digits))
+
+	// fmt.Println("test: ", (squared/int(math.Pow(100, float64(start))))%int(math.Pow(100, float64(digits))))
 
 	// модуль от размера таблицы чтобы получить валидный ключ
 	hashValue := middleDigits % tableSize
