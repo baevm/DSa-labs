@@ -101,7 +101,6 @@ func (ht *HTable) Print() {
 	fmt.Println("|-------|-------|")
 	fmt.Printf("| %-5s | %-5s |\n", "key", "value")
 	fmt.Println("|-------|-------|")
-
 	for _, h := range ht.buckets {
 		fmt.Printf("| %-5d | %-5d |\n", h.key, h.value)
 	}

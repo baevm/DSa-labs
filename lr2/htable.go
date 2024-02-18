@@ -65,19 +65,27 @@ func (ht *HTable) Get(key int) (HValue, error) {
 		return HValue{}, ErrElemNotFound
 	}
 
-	for ht.buckets[hash].value != key && probeCount < MAX_PROBE_COUNT {
+	for ht.buckets[hash].value != key && probeCount < MAX_PROBE_COUNT && hash < size {
 		hash = (hash0 + probeCount*probeCount) % size
 		probeCount += 1
 	}
 
+	if ht.buckets[hash].value == key {
+		return ht.buckets[hash], nil
+	}
+
 	if probeCount >= MAX_PROBE_COUNT && ht.buckets[hash].value != key {
-		for ht.buckets[hash].value != -1 {
+		for hash < ht.size && ht.buckets[hash].value != -1 {
 			hash += 1
 			probeCount += 1
 		}
 	}
 
-	return ht.buckets[hash], nil
+	if ht.buckets[hash].value == key {
+		return ht.buckets[hash], nil
+	}
+
+	return HValue{}, ErrElemNotFound
 }
 
 func (ht *HTable) Set(key, value int) (int, bool) {
@@ -96,21 +104,34 @@ func (ht *HTable) Set(key, value int) (int, bool) {
 		ht.stats.amountOfProbes += 1
 	} else {
 		// Квадратичная проба
-		for ht.buckets[hash].value != -1 && probeCount < 30 {
+		for ht.buckets[hash].value != -1 && probeCount < MAX_PROBE_COUNT {
 			hash = (hash0 + probeCount*probeCount) % size
 			probeCount += 1
+
+			fmt.Println("quad hash: ", hash, "probeCount: ", probeCount)
 
 			ht.stats.amountOfProbes += 1
 		}
 
-		isSet = true
-		ht.buckets[hash] = HValue{key: hash, value: value}
+		if ht.buckets[hash].value == -1 && probeCount <= MAX_PROBE_COUNT {
+			isSet = true
+			ht.buckets[hash] = HValue{key: hash, value: value}
+		}
 	}
 
 	// Линейная проба
-	if !isSet && probeCount >= 30 {
+	if !isSet && probeCount >= MAX_PROBE_COUNT {
 		for ht.buckets[hash].value != -1 {
 			hash = hash + 1
+
+			fmt.Println("linear hash: ", hash, "probeCount: ", probeCount)
+
+			ht.stats.amountOfProbes += 1
+		}
+
+		if ht.buckets[hash].value == -1 {
+			isSet = true
+			ht.buckets[hash] = HValue{key: hash, value: value}
 		}
 	}
 
@@ -137,7 +158,31 @@ func (ht *HTable) Delete(value int) (int, bool) {
 		value: -1,
 	}
 
+	ht.stats.usedBucketsCount -= 1
+
 	return idx, true
+}
+
+func (ht *HTable) Change(oldElement, newElement int) (int, error) {
+	newElemExist, _ := ht.Get(newElement)
+
+	if newElemExist.value == newElement {
+		return 0, fmt.Errorf("Элемент %d уже существует. \n\n", newElement)
+	}
+
+	_, isDeleted := ht.Delete(oldElement)
+
+	if !isDeleted {
+		return 0, fmt.Errorf("Элемент %d не найден. \n\n", oldElement)
+	}
+
+	idx, isSet := ht.Set(newElement, newElement)
+
+	if !isSet {
+		return 0, fmt.Errorf("Что то пошло не так... Элемент: %d \n\n", newElement)
+	}
+
+	return idx, nil
 }
 
 func (ht *HTable) ExtendTable() {
@@ -207,12 +252,10 @@ func HashValue(value, tableSize int) int {
 	// достаем середину
 	middleDigits := (squared / int(math.Pow10(start))) % int(math.Pow10(digits))
 
-	// fmt.Println("test: ", (squared/int(math.Pow(100, float64(start))))%int(math.Pow(100, float64(digits))))
-
 	// модуль от размера таблицы чтобы получить валидный ключ
 	hashValue := middleDigits % tableSize
 
-	fmt.Printf("середина: %d\t hash значение: %d\t значение: %d\t квадрат: %d\t\n ", middleDigits, hashValue, value, squared)
+	// fmt.Printf("середина: %d\t hash значение: %d\t значение: %d\t квадрат: %d\t\n ", middleDigits, hashValue, value, squared)
 
 	return hashValue
 }
@@ -229,7 +272,7 @@ func getRandomElemets(min, max, size int) []int {
 		p[i] += min
 	}
 
-	fmt.Println("min ", min, "max ", max, "size ", size, "p ", p, "p len", len(p))
+	// fmt.Println("min ", min, "max ", max, "size ", size, "p ", p, "p len", len(p))
 
 	return p[:size]
 }

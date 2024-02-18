@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"math"
 	"os"
 )
 
@@ -28,13 +27,14 @@ const (
 )
 
 func main() {
-	var size float64
+	var size int
 
 	fmt.Print("Введите начальный размер таблицы: ")
 	fmt.Scanln(&size)
 
-	hTableSize := int(math.Floor(size * 1.5))
-	hashTable := NewHTable(hTableSize)
+	// hTableSize := int(math.Floor(size * 1.5))
+
+	hashTable := NewHTable(size)
 
 	for {
 		fmt.Printf(`
@@ -77,9 +77,20 @@ func main() {
 			fmt.Print("Введите элемент: ")
 			fmt.Scanf("%d", &element)
 
-			if _, err := hashTable.Get(element); err == nil {
-				fmt.Println(err.Error())
-				fmt.Printf("Элемент: %d \n\n", element)
+			if element < 1 {
+				fmt.Printf("Элемент должен быть больше 0 \n\n")
+				break
+			}
+
+			if hashTable.size == hashTable.stats.usedBucketsCount {
+				fmt.Printf("Таблица полностью заполнена. Удалите элементы перед добавлением нового \n\n")
+				break
+			}
+
+			elemExist, _ := hashTable.Get(element)
+
+			if elemExist.value == element {
+				fmt.Printf("Элемент уже существует. Индекс: %d \n\n", elemExist.key)
 				break
 			}
 
@@ -135,6 +146,16 @@ func main() {
 			fmt.Print("Введите заменяемый элемент: ")
 			fmt.Scanf("%d", &element)
 
+			if element < 1 {
+				fmt.Printf("Элемент должен быть больше 0 \n\n")
+				break
+			}
+
+			if hashTable.size == hashTable.stats.usedBucketsCount {
+				fmt.Printf("Таблица полностью заполнена. Удалите элементы перед добавлением нового \n\n")
+				break
+			}
+
 			_, err := hashTable.Get(element)
 
 			if err != nil {
@@ -147,26 +168,10 @@ func main() {
 			fmt.Print("Введите новый элемент: ")
 			fmt.Scanf("%d", &newElement)
 
-			_, err = hashTable.Get(newElement)
+			idx, err := hashTable.Change(element, newElement)
 
 			if err != nil {
-				if !errors.Is(err, ErrElemNotFound) {
-					fmt.Printf("Элемент %d уже существует. \n\n", newElement)
-					break
-				}
-			}
-
-			_, isDeleted := hashTable.Delete(element)
-
-			if !isDeleted {
-				fmt.Printf("Элемент %d не найден. \n\n", element)
-				break
-			}
-
-			idx, isSet := hashTable.Set(newElement, newElement)
-
-			if !isSet {
-				fmt.Printf("Что то пошло не так... Элемент: %d \n\n", newElement)
+				fmt.Printf("%s \n\n", err.Error())
 				break
 			}
 
