@@ -27,7 +27,7 @@ type HTable struct {
 
 const MAX_PROBE_COUNT = 40
 const LIMIT_COEF = 0.5
-const EMPTY_KEY = -1
+const EMPTY_VAL = -1
 
 var (
 	ErrMaxProbe     = errors.New("ошибка: Достигнуто максимальное количество проб")
@@ -47,7 +47,7 @@ func NewHTable(initialSize int) *HTable {
 	}
 
 	for i := range ht.buckets {
-		ht.buckets[i].value = -1
+		ht.buckets[i].value = EMPTY_VAL
 		ht.buckets[i].key = i
 	}
 
@@ -61,7 +61,7 @@ func (ht *HTable) Get(key int) (HValue, error) {
 	probeCount := 0
 	size := len(ht.buckets)
 
-	if ht.buckets[hash].value == -1 {
+	if ht.buckets[hash].value == EMPTY_VAL {
 		return HValue{}, ErrElemNotFound
 	}
 
@@ -75,7 +75,7 @@ func (ht *HTable) Get(key int) (HValue, error) {
 	}
 
 	if probeCount >= MAX_PROBE_COUNT && ht.buckets[hash].value != key {
-		for hash < ht.size && ht.buckets[hash].value != -1 {
+		for hash < ht.size && ht.buckets[hash].value != EMPTY_VAL {
 			hash += 1
 			probeCount += 1
 		}
@@ -97,14 +97,14 @@ func (ht *HTable) Set(key, value int) (int, bool) {
 	probeCount := 0
 	size := len(ht.buckets)
 
-	if ht.buckets[hash].value == EMPTY_KEY {
+	if ht.buckets[hash].value == EMPTY_VAL {
 		ht.buckets[hash] = HValue{key: hash, value: value}
 		isSet = true
 
 		ht.stats.amountOfProbes += 1
 	} else {
 		// Квадратичная проба
-		for ht.buckets[hash].value != -1 && probeCount < MAX_PROBE_COUNT {
+		for ht.buckets[hash].value != EMPTY_VAL && probeCount < MAX_PROBE_COUNT {
 			hash = (hash0 + probeCount*probeCount) % size
 			probeCount += 1
 
@@ -113,7 +113,7 @@ func (ht *HTable) Set(key, value int) (int, bool) {
 			ht.stats.amountOfProbes += 1
 		}
 
-		if ht.buckets[hash].value == -1 && probeCount <= MAX_PROBE_COUNT {
+		if ht.buckets[hash].value == EMPTY_VAL && probeCount <= MAX_PROBE_COUNT {
 			isSet = true
 			ht.buckets[hash] = HValue{key: hash, value: value}
 		}
@@ -121,7 +121,7 @@ func (ht *HTable) Set(key, value int) (int, bool) {
 
 	// Линейная проба
 	if !isSet && probeCount >= MAX_PROBE_COUNT {
-		for ht.buckets[hash].value != -1 {
+		for ht.buckets[hash].value != EMPTY_VAL {
 			hash = hash + 1
 
 			fmt.Println("linear hash: ", hash, "probeCount: ", probeCount)
@@ -129,7 +129,7 @@ func (ht *HTable) Set(key, value int) (int, bool) {
 			ht.stats.amountOfProbes += 1
 		}
 
-		if ht.buckets[hash].value == -1 {
+		if ht.buckets[hash].value == EMPTY_VAL {
 			isSet = true
 			ht.buckets[hash] = HValue{key: hash, value: value}
 		}
@@ -148,14 +148,14 @@ func (ht *HTable) Delete(value int) (int, bool) {
 	elem, err := ht.Get(value)
 
 	if err != nil {
-		return EMPTY_KEY, false
+		return EMPTY_VAL, false
 	}
 
 	idx := elem.key
 
 	ht.buckets[idx] = HValue{
 		key:   idx,
-		value: -1,
+		value: EMPTY_VAL,
 	}
 
 	ht.stats.usedBucketsCount -= 1
@@ -195,7 +195,8 @@ func (ht *HTable) ExtendTable() {
 	}
 
 	for i := 0; i < newSize; i++ {
-		ht.buckets = append(ht.buckets, HValue{key: EMPTY_KEY})
+		// fix
+		ht.buckets = append(ht.buckets, HValue{key: ht.size + i, value: EMPTY_VAL})
 	}
 
 	ht.size += newSize
