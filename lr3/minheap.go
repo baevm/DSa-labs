@@ -6,83 +6,114 @@ import (
 	"strings"
 )
 
-type Comparer interface {
-	Compare(Comparer) int
-}
-
 // Коллекция элементов с методом сравнения.
 // Может использоваться в min и max MinHeap
-type MinHeap []Comparer
+type MinHeap struct {
+	heap []int
+}
 
 // min-heap
 func NewMinHeap() MinHeap {
-	heap := make(MinHeap, 0)
+	heap := make([]int, 0)
 
-	return heap
+	return MinHeap{
+		heap: heap,
+	}
 }
 
-func (hptr *MinHeap) Push(i Comparer) {
-	h := *hptr
+func (mh *MinHeap) Push(newElem int) {
+	h := mh.heap
 
-	h = append(h, i)
-
+	// Добавляем новый элемент в конец массива
+	// и сохраняем его индекс
+	h = append(h, newElem)
 	idx := len(h) - 1
 
+	// пока не прошли все родительские элементы
 	for idx > 0 {
+		// родительский элемент
 		parentIdx := idx / 2
 
-		if h[idx].Compare(h[parentIdx]) > 0 {
+		// новый элемент больше родительского
+		// оставляем его на месте и выходим
+		if h[idx] > h[parentIdx] {
 			break
 		}
 
+		// меняем местами
 		h[idx], h[parentIdx] = h[parentIdx], h[idx]
 		idx = parentIdx
 	}
 
-	*hptr = h
+	mh.heap = h
 }
 
-func (hptr *MinHeap) Pop() Comparer {
-	h := *hptr
+func (mh *MinHeap) Pop() int {
+	h := mh.heap
+
+	// размер кучи
 	n := len(h)
 
 	// пустая куча
 	if n == 0 {
-		return nil
+		return -1
 	}
 
+	// сохраняем корневой элемент
 	idx := 0
 	root := h[idx]
 
+	// последний элемент в куче
 	v := h[n-1]
 
 	for {
+		// индекс левого потомка текущего узла
 		childIdx := idx*2 + 1
+
+		// если левый потомок находится за пределами кучи
 		if childIdx >= n {
-			break // больше нет детей, выход
-		}
-
-		if childIdx+1 < n && h[childIdx].Compare(h[childIdx+1]) > 0 {
-			childIdx += 1
-		}
-
-		if v.Compare(h[childIdx]) < 0 {
 			break
 		}
 
+		// если есть правый потомок и он меньше левого, выбираем его
+		if childIdx+1 < n && h[childIdx] > h[childIdx+1] {
+			childIdx += 1
+		}
+
+		// если значение последнего элемента меньше чем значение выбранного потомка, выходим
+		if v < h[childIdx] {
+			break
+		}
+
+		// перемещаем значение потомка в текущий узел
+		// и обновляем индекс текущего узла
 		h[idx] = h[childIdx]
 		idx = childIdx
 	}
 
 	h[idx] = v
 
-	*hptr = h[:len(h)-1]
+	// обновляем кучу, удаляя последний элемент
+	mh.heap = h[:len(h)-1]
 
+	// возвращаем удаленное минимальное значение
 	return root
 }
 
-func (hptr *MinHeap) PrintHeap() {
-	heapy := MinHeap(*hptr)
+func (mh *MinHeap) Traverse(idx int) {
+	h := mh.heap
+
+	if idx >= len(h) {
+		return
+	}
+
+	fmt.Printf("%d ->", h[idx])
+	mh.Traverse((2 * idx) + 1)
+	mh.Traverse((2 * idx) + 2)
+}
+
+func (mh *MinHeap) PrintHeap() {
+	heapy := mh.heap
 
 	size := len(heapy)
 
@@ -132,30 +163,4 @@ func (hptr *MinHeap) PrintHeap() {
 	}
 
 	fmt.Println(hs.String())
-}
-
-func (hptr *MinHeap) Traverse(idx int) {
-	h := MinHeap(*hptr)
-
-	if idx >= len(h) {
-		return
-	}
-
-	fmt.Printf("%d ->", h[idx])
-	hptr.Traverse((2 * idx) + 1)
-	hptr.Traverse((2 * idx) + 2)
-}
-
-type Int int
-
-func (a Int) Compare(b Comparer) int {
-	bint := b.(Int)
-
-	if a < bint {
-		return -1
-	} else if a == bint {
-		return 0
-	} else {
-		return 1
-	}
 }

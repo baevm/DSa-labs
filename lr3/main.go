@@ -26,15 +26,15 @@ func main() {
 	minheap := NewMinHeap()
 
 	for _, elem := range randomElements {
-		minheap.Push(Int(elem))
+		minheap.Push(elem)
 	}
 
+	fmt.Println("size=", len(minheap.heap))
 	fmt.Println("MinHeap=", minheap)
-	fmt.Println("size=", len(minheap))
 
 	minheap.PrintHeap()
 
-	fmt.Println("Traverse:")
+	fmt.Println("NLR Traverse:")
 	minheap.Traverse(0)
 }
 
