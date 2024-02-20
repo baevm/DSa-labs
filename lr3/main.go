@@ -14,24 +14,28 @@ import (
 // вершин построенного Min-Heap-Tree, соответствующую прямому порядку прохождения (NLR).
 
 func main() {
-	randomElements := getRandomElemets(99, 999, 24)
+	const size = 24
+	const min = 99
+	const max = 999
+
+	randomElements := getRandomElemets(min, max, size)
 
 	fmt.Println("Случайные элементы: ", randomElements)
 
-	// min heap
-	min := NewMinHeap()
+	// minheap heap
+	minheap := NewMinHeap()
 
 	for _, elem := range randomElements {
-		min.Push(Int(elem))
+		minheap.Push(Int(elem))
 	}
 
-	fmt.Println("MinHeap=", min)
-	fmt.Println("size=", len(min))
+	fmt.Println("MinHeap=", minheap)
+	fmt.Println("size=", len(minheap))
 
-	min.PrintHeap()
+	minheap.PrintHeap()
 
 	fmt.Println("Traverse:")
-	min.Traverse(0)
+	minheap.Traverse(0)
 }
 
 func getRandomElemets(min, max, size int) []int {

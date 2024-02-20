@@ -27,7 +27,6 @@ func (hptr *MinHeap) Push(i Comparer) {
 	h = append(h, i)
 
 	idx := len(h) - 1
-	// parent := (idx - 1) / 2
 
 	for idx > 0 {
 		parentIdx := idx / 2
