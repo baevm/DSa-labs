@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 )
 
@@ -17,8 +18,7 @@ import (
 //	  среднее число шагов необходимых для размещения некоторого ключа в таблице.
 
 const (
-	RND = iota + 1
-	ADD
+	ADD = iota + 1
 	FIND
 	DEL
 	CHANGE
@@ -27,26 +27,29 @@ const (
 )
 
 func main() {
-	var size int
+	const size = 49
+	const min = 10
+	const max = 99
 
-	fmt.Print("Введите начальный размер таблицы: ")
-	fmt.Scanln(&size)
+	hTableSize := int(math.Floor(size * 1.5))
 
-	// hTableSize := int(math.Floor(size * 1.5))
+	hashTable := NewHTable(hTableSize)
 
-	hashTable := NewHTable(size)
+	hashTable.AddRandomElements(min, max, size, false)
+
+	fmt.Println("Начальная таблица:")
+	hashTable.Print()
 
 	for {
 		fmt.Printf(`
 Выберите нужный вариант:
-%d. Сгенерировать "свободный размер/2" случайных элементов
 %d. Добавить элемент
 %d. Поиск элемента
 %d. Удалить элемент
 %d. Заменить элемент
 %d. Вывести статистику (коэффициент заполнения таблицы, среднее число шагов необходимых для размещения ключа в таблице)
 %d. Вывести таблицу
-`, RND, ADD, FIND, DEL, CHANGE, STATS, PRINT)
+`, ADD, FIND, DEL, CHANGE, STATS, PRINT)
 
 		fmt.Print("Ваш выбор: ")
 
@@ -59,49 +62,62 @@ func main() {
 		}
 
 		switch answer {
-		case RND:
-			var min, max int
-
-			fmt.Println("Введите минимальный элемент: ")
-			fmt.Scanf("%d", &min)
-
-			fmt.Println("Введите максимальный элемент: ")
-			fmt.Scanf("%d", &max)
-
-			addedLen := hashTable.AddRandomElements(min, max)
-			fmt.Printf("Элементы добавлены: %d \n\n", addedLen)
-
 		case ADD:
-			var element int
+			fmt.Println("Выберите вариант:")
+			fmt.Println("1. Добавить в интерактивном режиме")
+			fmt.Println("2. Сгенерировать случайные числа")
 
-			fmt.Print("Введите элемент: ")
-			fmt.Scanf("%d", &element)
+			var answerAdd int
+			fmt.Scan(&answerAdd)
 
-			if element < 1 {
-				fmt.Printf("Элемент должен быть больше 0 \n\n")
+			switch answerAdd {
+			case 1:
+				var element int
+
+				fmt.Print("Введите элемент: ")
+				fmt.Scanf("%d", &element)
+
+				if element < 1 {
+					fmt.Printf("Элемент должен быть больше 0 \n\n")
+					break
+				}
+
+				if hashTable.size == hashTable.stats.usedBucketsCount {
+					fmt.Printf("Таблица полностью заполнена. Удалите элементы перед добавлением нового \n\n")
+					break
+				}
+
+				elemExist, _ := hashTable.Get(element)
+
+				if elemExist.value == element {
+					fmt.Printf("Элемент уже существует. Индекс: %d \n\n", elemExist.key)
+					break
+				}
+
+				idx, isSet := hashTable.Set(element, element)
+
+				if !isSet {
+					fmt.Printf("Что то пошло не так... Элемент: %d \n\n", element)
+					break
+				}
+
+				fmt.Printf("Индекс нового элемента: %d \n\n", idx)
+
+			case 2:
+				var answerSize int
+				fmt.Println("Введите размер:")
+
+				fmt.Scan(&answerSize)
+
+				for answerSize > 0 {
+					addedLen := hashTable.AddRandomElements(min, max, 1, true)
+
+					answerSize -= addedLen
+				}
+
+			default:
 				break
 			}
-
-			if hashTable.size == hashTable.stats.usedBucketsCount {
-				fmt.Printf("Таблица полностью заполнена. Удалите элементы перед добавлением нового \n\n")
-				break
-			}
-
-			elemExist, _ := hashTable.Get(element)
-
-			if elemExist.value == element {
-				fmt.Printf("Элемент уже существует. Индекс: %d \n\n", elemExist.key)
-				break
-			}
-
-			idx, isSet := hashTable.Set(element, element)
-
-			if !isSet {
-				fmt.Printf("Что то пошло не так... Элемент: %d \n\n", element)
-				break
-			}
-
-			fmt.Printf("Индекс нового элемента: %d \n\n", idx)
 
 		case FIND:
 			var element int
@@ -168,13 +184,14 @@ func main() {
 			fmt.Print("Введите новый элемент: ")
 			fmt.Scanf("%d", &newElement)
 
-			idx, err := hashTable.Change(element, newElement)
+			idx, oldIdx, err := hashTable.Change(element, newElement)
 
 			if err != nil {
 				fmt.Printf("%s \n\n", err.Error())
 				break
 			}
 
+			fmt.Printf("Индекс удаленного элемента: %d \n\n", oldIdx)
 			fmt.Printf("Индекс нового элемента: %d \n\n", idx)
 
 		case STATS:

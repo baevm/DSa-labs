@@ -65,6 +65,7 @@ func (ht *HTable) Get(key int) (HValue, error) {
 		return HValue{}, ErrElemNotFound
 	}
 
+	// квадратичное пробирование
 	for ht.buckets[hash].value != key && probeCount < MAX_PROBE_COUNT && hash < size {
 		hash = (hash0 + probeCount*probeCount) % size
 		probeCount += 1
@@ -74,8 +75,12 @@ func (ht *HTable) Get(key int) (HValue, error) {
 		return ht.buckets[hash], nil
 	}
 
+	// линейное пробирование
 	if probeCount >= MAX_PROBE_COUNT && ht.buckets[hash].value != key {
+		hash = 0
+
 		for hash < ht.size && ht.buckets[hash].value != EMPTY_VAL {
+
 			hash += 1
 			probeCount += 1
 		}
@@ -108,7 +113,7 @@ func (ht *HTable) Set(key, value int) (int, bool) {
 			hash = (hash0 + probeCount*probeCount) % size
 			probeCount += 1
 
-			fmt.Println("quad hash: ", hash, "probeCount: ", probeCount)
+			// fmt.Println("quad hash: ", hash, "probeCount: ", probeCount)
 
 			ht.stats.amountOfProbes += 1
 		}
@@ -121,10 +126,12 @@ func (ht *HTable) Set(key, value int) (int, bool) {
 
 	// Линейная проба
 	if !isSet && probeCount >= MAX_PROBE_COUNT {
-		for ht.buckets[hash].value != EMPTY_VAL {
+		hash = 0
+
+		for hash < ht.size && ht.buckets[hash].value != EMPTY_VAL {
 			hash = hash + 1
 
-			fmt.Println("linear hash: ", hash, "probeCount: ", probeCount)
+			// fmt.Println("linear hash: ", hash, "probeCount: ", probeCount)
 
 			ht.stats.amountOfProbes += 1
 		}
@@ -153,6 +160,8 @@ func (ht *HTable) Delete(value int) (int, bool) {
 
 	idx := elem.key
 
+	// TODO: пустое удаленное значение должно быть с другим value. например -2
+	// при поиске проверять если -2, то значит оно тоже пустое
 	ht.buckets[idx] = HValue{
 		key:   idx,
 		value: EMPTY_VAL,
@@ -163,26 +172,26 @@ func (ht *HTable) Delete(value int) (int, bool) {
 	return idx, true
 }
 
-func (ht *HTable) Change(oldElement, newElement int) (int, error) {
+func (ht *HTable) Change(oldElement, newElement int) (int, int, error) {
 	newElemExist, _ := ht.Get(newElement)
 
 	if newElemExist.value == newElement {
-		return 0, fmt.Errorf("Элемент %d уже существует. \n\n", newElement)
+		return 0, 0, fmt.Errorf("Элемент %d уже существует. \n\n", newElement)
 	}
 
-	_, isDeleted := ht.Delete(oldElement)
+	oldIdx, isDeleted := ht.Delete(oldElement)
 
 	if !isDeleted {
-		return 0, fmt.Errorf("Элемент %d не найден. \n\n", oldElement)
+		return 0, 0, fmt.Errorf("Элемент %d не найден. \n\n", oldElement)
 	}
 
 	idx, isSet := ht.Set(newElement, newElement)
 
 	if !isSet {
-		return 0, fmt.Errorf("Что то пошло не так... Элемент: %d \n\n", newElement)
+		return 0, 0, fmt.Errorf("Что то пошло не так... Элемент: %d \n\n", newElement)
 	}
 
-	return idx, nil
+	return idx, oldIdx, nil
 }
 
 func (ht *HTable) ExtendTable() {
@@ -203,13 +212,21 @@ func (ht *HTable) ExtendTable() {
 }
 
 func (ht *HTable) Print() {
-	fmt.Println("|-------|-------|")
-	fmt.Printf("| %-5s | %-5s |\n", "key", "value")
-	fmt.Println("|-------|-------|")
-	for _, h := range ht.buckets {
-		fmt.Printf("| %-5d | %-5d |\n", h.key, h.value)
-	}
-	fmt.Println("|-------|-------|")
+	// fmt.Println("|-------|-------|")
+	// fmt.Printf("| %-5s | %-5s |\n", "key", "value")
+	// fmt.Println("|-------|-------|")
+	// for _, h := range ht.buckets {
+	// 	fmt.Printf("| %-5d | %-5d |\n", h.key, h.value)
+	// }
+	fmt.Printf("%+v \n\n", ht.buckets[0:10])
+	fmt.Printf("%+v \n\n", ht.buckets[10:20])
+	fmt.Printf("%+v \n\n", ht.buckets[20:30])
+	fmt.Printf("%+v \n\n", ht.buckets[30:40])
+	fmt.Printf("%+v \n\n", ht.buckets[40:50])
+	fmt.Printf("%+v \n\n", ht.buckets[50:60])
+	fmt.Printf("%+v \n\n", ht.buckets[70:])
+
+	// fmt.Println("|-------|-------|")
 }
 
 func (ht *HTable) PrintStats() {
@@ -223,15 +240,26 @@ func (ht *HTable) PrintStats() {
 	fmt.Printf("Среднее число проб: %f\n", avgProbes)
 }
 
-func (ht *HTable) AddRandomElements(min, max int) int {
-	elements := getRandomElemets(min, max, (ht.size-ht.stats.usedBucketsCount)/2)
+func (ht *HTable) AddRandomElements(min, max, size int, isPrintValue bool) int {
+	elements := getRandomElemets(min, max, size)
 
 	for _, v := range elements {
-		_, isOk := ht.Set(v, v)
+		// elem, _ := ht.Get(v)
+
+		// if elem.value != -1 {
+		// 	return 0
+		// }
+
+		idx, isOk := ht.Set(v, v)
 
 		if !isOk {
 			fmt.Printf("Failed to set value:%d\n", v)
 		}
+
+		if isPrintValue {
+			fmt.Printf("Индекс добавленного случайного элемента %v: %v \n", v, idx)
+		}
+
 	}
 
 	return len(elements)
