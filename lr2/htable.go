@@ -25,9 +25,10 @@ type HTable struct {
 	stats Stats
 }
 
-const MAX_PROBE_COUNT = 40
+const MAX_PROBE_COUNT = 30
 const LIMIT_COEF = 0.5
 const EMPTY_VAL = -1
+const DELETED_VAL = -2
 
 var (
 	ErrMaxProbe     = errors.New("ошибка: Достигнуто максимальное количество проб")
@@ -61,28 +62,35 @@ func (ht *HTable) Get(key int) (HValue, error) {
 	probeCount := 0
 	size := len(ht.buckets)
 
+	fmt.Println("CALLED GET: ", hash)
+
 	if ht.buckets[hash].value == EMPTY_VAL {
+		fmt.Println("GET INITIAL HASH: ", hash)
 		return HValue{}, ErrElemNotFound
 	}
 
 	// квадратичное пробирование
-	for ht.buckets[hash].value != key && probeCount < MAX_PROBE_COUNT && hash < size {
+	for ht.buckets[hash].value != key && probeCount < MAX_PROBE_COUNT /* && hash < size */ {
 		hash = (hash0 + probeCount*probeCount) % size
 		probeCount += 1
+
+		fmt.Println("GET QUAD HASH: ", hash)
 	}
 
 	if ht.buckets[hash].value == key {
 		return ht.buckets[hash], nil
 	}
 
+	fmt.Println("PROBE COUNT AFTER QUAD: ", probeCount)
+
 	// линейное пробирование
-	if probeCount >= MAX_PROBE_COUNT && ht.buckets[hash].value != key {
-		hash = 0
+	if probeCount >= MAX_PROBE_COUNT {
+		hash = hash0
 
 		for hash < ht.size && ht.buckets[hash].value != EMPTY_VAL {
-
 			hash += 1
 			probeCount += 1
+			fmt.Printf("GET LIN HASH: %d SIZE: %d \n", hash, ht.size)
 		}
 	}
 
@@ -94,13 +102,12 @@ func (ht *HTable) Get(key int) (HValue, error) {
 }
 
 func (ht *HTable) Set(key, value int) (int, bool) {
-	hash := HashValue(key, len(ht.buckets))
+	hash := HashValue(key, ht.size)
 
 	hash0 := hash
 
 	isSet := false
 	probeCount := 0
-	size := len(ht.buckets)
 
 	if ht.buckets[hash].value == EMPTY_VAL {
 		ht.buckets[hash] = HValue{key: hash, value: value}
@@ -110,15 +117,15 @@ func (ht *HTable) Set(key, value int) (int, bool) {
 	} else {
 		// Квадратичная проба
 		for ht.buckets[hash].value != EMPTY_VAL && probeCount < MAX_PROBE_COUNT {
-			hash = (hash0 + probeCount*probeCount) % size
+			hash = (hash0 + probeCount*probeCount) % ht.size
 			probeCount += 1
 
-			// fmt.Println("quad hash: ", hash, "probeCount: ", probeCount)
-
 			ht.stats.amountOfProbes += 1
+
+			fmt.Println("SET QUAD HASH: ", hash)
 		}
 
-		if ht.buckets[hash].value == EMPTY_VAL && probeCount <= MAX_PROBE_COUNT {
+		if ht.buckets[hash].value == EMPTY_VAL {
 			isSet = true
 			ht.buckets[hash] = HValue{key: hash, value: value}
 		}
@@ -126,14 +133,14 @@ func (ht *HTable) Set(key, value int) (int, bool) {
 
 	// Линейная проба
 	if !isSet && probeCount >= MAX_PROBE_COUNT {
-		hash = 0
+		hash = hash0
 
 		for hash < ht.size && ht.buckets[hash].value != EMPTY_VAL {
 			hash = hash + 1
 
-			// fmt.Println("linear hash: ", hash, "probeCount: ", probeCount)
-
 			ht.stats.amountOfProbes += 1
+
+			fmt.Println("SET LIN HASH: ", hash)
 		}
 
 		if ht.buckets[hash].value == EMPTY_VAL {
@@ -143,10 +150,6 @@ func (ht *HTable) Set(key, value int) (int, bool) {
 	}
 
 	ht.stats.usedBucketsCount += 1
-
-	// if ht.getCoef() >= LIMIT_COEF {
-	// 	ht.ExtendTable()
-	// }
 
 	return hash, isSet
 }
@@ -194,39 +197,15 @@ func (ht *HTable) Change(oldElement, newElement int) (int, int, error) {
 	return idx, oldIdx, nil
 }
 
-func (ht *HTable) ExtendTable() {
-	var newSize int
-
-	if ht.size == 1 {
-		newSize = 2
-	} else {
-		newSize = int(float64(ht.size) * 0.5)
-	}
-
-	for i := 0; i < newSize; i++ {
-		// fix
-		ht.buckets = append(ht.buckets, HValue{key: ht.size + i, value: EMPTY_VAL})
-	}
-
-	ht.size += newSize
-}
-
 func (ht *HTable) Print() {
-	// fmt.Println("|-------|-------|")
-	// fmt.Printf("| %-5s | %-5s |\n", "key", "value")
-	// fmt.Println("|-------|-------|")
-	// for _, h := range ht.buckets {
-	// 	fmt.Printf("| %-5d | %-5d |\n", h.key, h.value)
-	// }
 	fmt.Printf("%+v \n\n", ht.buckets[0:10])
 	fmt.Printf("%+v \n\n", ht.buckets[10:20])
 	fmt.Printf("%+v \n\n", ht.buckets[20:30])
 	fmt.Printf("%+v \n\n", ht.buckets[30:40])
 	fmt.Printf("%+v \n\n", ht.buckets[40:50])
 	fmt.Printf("%+v \n\n", ht.buckets[50:60])
+	fmt.Printf("%+v \n\n", ht.buckets[60:70])
 	fmt.Printf("%+v \n\n", ht.buckets[70:])
-
-	// fmt.Println("|-------|-------|")
 }
 
 func (ht *HTable) PrintStats() {
@@ -244,12 +223,6 @@ func (ht *HTable) AddRandomElements(min, max, size int, isPrintValue bool) int {
 	elements := getRandomElemets(min, max, size)
 
 	for _, v := range elements {
-		// elem, _ := ht.Get(v)
-
-		// if elem.value != -1 {
-		// 	return 0
-		// }
-
 		idx, isOk := ht.Set(v, v)
 
 		if !isOk {
