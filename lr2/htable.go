@@ -62,26 +62,20 @@ func (ht *HTable) Get(key int) (HValue, error) {
 	probeCount := 0
 	size := len(ht.buckets)
 
-	fmt.Println("CALLED GET: ", hash)
-
 	if ht.buckets[hash].value == EMPTY_VAL {
-		fmt.Println("GET INITIAL HASH: ", hash)
 		return HValue{}, ErrElemNotFound
 	}
 
 	// квадратичное пробирование
-	for ht.buckets[hash].value != key && probeCount < MAX_PROBE_COUNT /* && hash < size */ {
+	for ht.buckets[hash].value != key && probeCount < MAX_PROBE_COUNT {
 		hash = (hash0 + probeCount*probeCount) % size
 		probeCount += 1
 
-		fmt.Println("GET QUAD HASH: ", hash)
 	}
 
 	if ht.buckets[hash].value == key {
 		return ht.buckets[hash], nil
 	}
-
-	fmt.Println("PROBE COUNT AFTER QUAD: ", probeCount)
 
 	// линейное пробирование
 	if probeCount >= MAX_PROBE_COUNT {
@@ -90,7 +84,6 @@ func (ht *HTable) Get(key int) (HValue, error) {
 		for hash < ht.size && ht.buckets[hash].value != EMPTY_VAL {
 			hash += 1
 			probeCount += 1
-			fmt.Printf("GET LIN HASH: %d SIZE: %d \n", hash, ht.size)
 		}
 	}
 
@@ -109,23 +102,21 @@ func (ht *HTable) Set(key, value int) (int, bool) {
 	isSet := false
 	probeCount := 0
 
-	if ht.buckets[hash].value == EMPTY_VAL {
+	if ht.buckets[hash].value == EMPTY_VAL || ht.buckets[hash].value == DELETED_VAL {
 		ht.buckets[hash] = HValue{key: hash, value: value}
 		isSet = true
 
 		ht.stats.amountOfProbes += 1
 	} else {
 		// Квадратичная проба
-		for ht.buckets[hash].value != EMPTY_VAL && probeCount < MAX_PROBE_COUNT {
+		for (ht.buckets[hash].value != EMPTY_VAL && ht.buckets[hash].value != DELETED_VAL) && probeCount < MAX_PROBE_COUNT {
 			hash = (hash0 + probeCount*probeCount) % ht.size
 			probeCount += 1
 
 			ht.stats.amountOfProbes += 1
-
-			fmt.Println("SET QUAD HASH: ", hash)
 		}
 
-		if ht.buckets[hash].value == EMPTY_VAL {
+		if ht.buckets[hash].value == EMPTY_VAL || ht.buckets[hash].value == DELETED_VAL {
 			isSet = true
 			ht.buckets[hash] = HValue{key: hash, value: value}
 		}
@@ -135,15 +126,13 @@ func (ht *HTable) Set(key, value int) (int, bool) {
 	if !isSet && probeCount >= MAX_PROBE_COUNT {
 		hash = hash0
 
-		for hash < ht.size && ht.buckets[hash].value != EMPTY_VAL {
+		for hash < ht.size && (ht.buckets[hash].value != EMPTY_VAL && ht.buckets[hash].value != DELETED_VAL) {
 			hash = hash + 1
 
 			ht.stats.amountOfProbes += 1
-
-			fmt.Println("SET LIN HASH: ", hash)
 		}
 
-		if ht.buckets[hash].value == EMPTY_VAL {
+		if ht.buckets[hash].value == EMPTY_VAL || ht.buckets[hash].value == DELETED_VAL {
 			isSet = true
 			ht.buckets[hash] = HValue{key: hash, value: value}
 		}
@@ -164,10 +153,11 @@ func (ht *HTable) Delete(value int) (int, bool) {
 	idx := elem.key
 
 	// TODO: пустое удаленное значение должно быть с другим value. например -2
-	// при поиске проверять если -2, то значит оно тоже пустое
+	// при поиске этот элемент будет пропускаться
+	// а при вставке проверяться на EMPTY_VAL или DELETED_VAL оба ключа считаются свободными
 	ht.buckets[idx] = HValue{
 		key:   idx,
-		value: EMPTY_VAL,
+		value: DELETED_VAL,
 	}
 
 	ht.stats.usedBucketsCount -= 1
